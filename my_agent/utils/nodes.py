@@ -1,10 +1,12 @@
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 import os
 from dotenv import load_dotenv
 from utils.state import GlobalState
 from utils.prompts import system_prompt
+from utils.tools import search_api, extract_api
+from langgraph.prebuilt import create_react_agent
 
 load_dotenv()
 openai_key = os.getenv('OPENAI_API_KEY')
@@ -12,24 +14,55 @@ openai_key = os.getenv('OPENAI_API_KEY')
 if not openai_key:
     raise ValueError("A OPENAI_API_KEY não foi encontrada. Verifique seu arquivo .env")
 
+research_tools = [search_api, extract_api]
+
 def researcher(state: dict):
     """
-    Recebe o tópico, as possíveis revisões do analista e do revisor e retorna os dados brutos coletados
+    Recebe o tópico, usa sua memória privada e as revisões mais recentes para coletar dados brutos.
     """
     llm = ChatOpenAI(
-        model= "gpt-4o-mini",
+        model="gpt-4o-mini",
         api_key=openai_key
     )
 
-    messages = [
-        SystemMessage(content=system_prompt(agent="researcher")),
-        HumanMessage(content=f"Topic: {state.get('topic', '')}\nLast research: {state.get('raw_data', '')}\nAnalyst review (if exists): {state.get('analyst_review', '')}\nReviewer review (if exists): {state.get('reviewer_review', '')}")
-    ]
+    react_agent = create_react_agent(
+        model=llm,
+        tools=research_tools,
+        prompt=system_prompt(agent="researcher")
+    )
 
-    llm_answer = llm.invoke(messages)
+    messages_to_pass = state.get("researcher_memory", [])
+    new_messages_to_memory = []
+
+    if not messages_to_pass:
+        # Se a memória está vazia, é o primeiro ciclo, então passamos apenas o tópico
+        instruction = f"Topic: {state.get('topic', '')}"
+        new_message = HumanMessage(content=instruction)
+        messages_to_pass.append(new_message)
+        new_messages_to_memory.append(new_message)
+    else:
+        # Se já tem memória, ele já sabe o tópico e lembra do seu último rascunho, só precisa das revisões
+        instruction = ""
+        if state.get("analyst_review"):
+            instruction += f"Your last research was rejected by the Analyst. Fix these issues:\n{state.get('analyst_review')}\n"
+        
+        if state.get("reviewer_review"):
+            instruction += f"The final report was rejected (Long-cycle). Reviewer context:\n{state.get('reviewer_review')}\n"
+        
+        if instruction:
+            new_message = HumanMessage(content=instruction)
+            messages_to_pass.append(new_message)
+            new_messages_to_memory.append(new_message)
+
+    react_agent_answer = react_agent.invoke({"messages": messages_to_pass})
+    final_result = react_agent_answer["messages"][-1].content
+
+    # Atualizamos a memória privada apenas com o resultado final, sem armazenar o "lixo" gerado pelo loop ReAct
+    new_messages_to_memory.append(AIMessage(content=final_result))
 
     return {
-        "raw_data": llm_answer.content
+        "raw_data": final_result, 
+        "researcher_memory": new_messages_to_memory
     }
 
 class AnalystOutput(BaseModel):
