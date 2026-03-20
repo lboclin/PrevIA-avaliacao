@@ -20,12 +20,14 @@ def route_analyst(state: GlobalState) -> str:
 
 def route_reviewer(state: GlobalState) -> str:
     """Verifica se o relatório final foi aprovado."""
-    if state.get("reviewer_approval") == "YES":
+    if state.get("reviewer_approval") == "APPROVED":
         return END
-    else:
-        # Retorna para o redator reescrever. O long-cycle não será implementado no walking skeleton
-        # Aqui terá a adição da contagem dos ciclos 2 e 3
+    elif state.get("reviewer_approval") == "WRITING_ERROR":
+        # Aqui terá a adição da contagem dos ciclo 2
         return "redactor"
+    else:
+        # Aqui terá a adição da contagem dos ciclo 3
+        return "researcher"
     
 workflow.add_edge(START, "researcher")
 workflow.add_edge("researcher", "analyst")
@@ -46,7 +48,8 @@ workflow.add_conditional_edges(
     route_reviewer,
     {
         END: END,
-        "redactor": "redactor"
+        "redactor": "redactor",
+        "researcher": "researcher"
     }
 )
 

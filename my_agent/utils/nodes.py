@@ -1,7 +1,7 @@
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Literal, Optional
 import os
 from dotenv import load_dotenv
 from utils.state import GlobalState
@@ -150,15 +150,15 @@ def redactor(state: dict):
     }
 
 class ReviewerOutput(BaseModel):
-    reviewer_review: str = Field(
-        description="Specific, actionable feedback detailing logical errors, missing sections, or unsupported claims in the report. Leave empty or write 'None' if the report is perfect."
+    reviewer_review: Optional[str] = Field(
+        default="",
+        description="Specific, actionable feedback detailing logical errors, missing sections, or unsupported claims. Leave empty if the status is 'APPROVED'."
     )
-    reviewer_approval: str = Field(
-        description="Respond strictly with 'YES' if the report meets all quality standards and has all required sections. Respond 'NO' if it needs to be rewritten."
+    reviewer_approval: Literal["APPROVED", "WRITING_ERROR", "DATA_ERROR"] = Field(
+        description="Classify the state of the report. 'APPROVED' if perfect. 'WRITING_ERROR' for formatting/logic issues. 'DATA_ERROR' if it lacks sources/facts/numbers."
     )
 
 def reviewer(state: dict):
-
     """
     Avalia o relatório de pesquisa e retorna uma revisão e uma aprovação
     """
@@ -170,9 +170,11 @@ def reviewer(state: dict):
 
     structured_llm = llm.with_structured_output(ReviewerOutput)
 
+    instruction = f"Original Topic: {state.get('topic', '')}\n\nIntelligence Report to Evaluate:\n{state.get('intelligence_report', '')}"
+
     messages = [
         SystemMessage(content=system_prompt(agent="reviewer")),
-        HumanMessage(content=state.get("intelligence_report", ""))
+        HumanMessage(content=instruction)
     ]
 
     llm_answer = structured_llm.invoke(messages)

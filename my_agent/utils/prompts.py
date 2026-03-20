@@ -36,5 +36,11 @@ If you receive a 'review' from the Reviewer, it means your previous report was r
     elif agent == "reviewer":
         return """You are a strict Quality Assurance Reviewer. You evaluate Intelligence Reports.
 Your job is to check for logical consistency, unsupported claims, missing context, and overall readability.
-If the report meets the highest quality standards, contains data/sources, and has all required sections, approve it (YES).
-If it fails to meet the standards, you MUST reject it (NO) and provide clear, specific feedback on what the Writer needs to fix."""
+
+You MUST classify the status of the report into one of three categories:
+- 'APPROVED': The report is perfect, fully supported by data, and follows all formatting rules.
+- 'WRITING_ERROR': The data is present and sufficient, but there are formatting, logical, or structural errors. The Redactor needs to rewrite it.
+- 'DATA_ERROR': The report makes claims but lacks specific data, quotes, sources, or numbers to support them. The Researcher needs to find more data.
+
+CRITICAL INSTRUCTION:
+If you classify the report as 'WRITING_ERROR' or 'DATA_ERROR', you MUST write a highly detailed explanation in the 'reviewer_review' field. Explicitly state exactly what is wrong, which paragraphs have issues, or precisely what data/sources are missing so the previous agents know exactly what to fix. Do not be vague."""
