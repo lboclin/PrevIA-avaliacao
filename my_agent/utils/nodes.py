@@ -1,13 +1,16 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
-from state import GlobalState
 import os
 from dotenv import load_dotenv
-from prompts import system_prompt
+from utils.state import GlobalState
+from utils.prompts import system_prompt
 
 load_dotenv()
 openai_key = os.getenv('OPENAI_API_KEY')
+
+if not openai_key:
+    raise ValueError("A OPENAI_API_KEY não foi encontrada. Verifique seu arquivo .env")
 
 def researcher(state: dict):
     """
@@ -30,17 +33,14 @@ def researcher(state: dict):
     }
 
 class AnalystOutput(BaseModel):
-
     critical_analysis: str = Field(
-        description="The critical analysis"
+        description="The detailed critical analysis identifying patterns, contradictions, and gaps based on the raw data."
     )
-
     analyst_review: str = Field(
-        description="The review of the raw data collected by the researcher"
+        description="Specific feedback detailing what is missing or wrong in the raw data. Leave empty or write 'None' if the data is perfect."
     )
-    
     analyst_approval: str = Field(
-        description="(YES) if raw data..."
+        description="Respond strictly with 'YES' if the raw data is sufficient and good enough to be passed to the Writer. Respond 'NO' if it needs more research."
     )
 
 def analyst(state: dict):
@@ -90,13 +90,11 @@ def redactor(state: dict):
     }
 
 class ReviewerOutput(BaseModel):
-
     reviewer_review: str = Field(
-        description="The review"
+        description="Specific, actionable feedback detailing logical errors, missing sections, or unsupported claims in the report. Leave empty or write 'None' if the report is perfect."
     )
-    
     reviewer_approval: str = Field(
-        description="(YES) if the intelligence report..."
+        description="Respond strictly with 'YES' if the report meets all quality standards and has all required sections. Respond 'NO' if it needs to be rewritten."
     )
 
 def reviewer(state: dict):
