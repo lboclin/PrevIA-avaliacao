@@ -117,8 +117,16 @@ if __name__ == "__main__":
     
     for step in app.stream(initial_state, stream_mode="values"):
         print(f"\n--- Estado atualizado ---")
+        
         for key, value in step.items():
-            print(f"{key}: {str(value)[:100]}...")
+            if key in ["analyst_review", "reviewer_review", "analyst_approval", "reviewer_approval", "cycle_1_counter"]:
+                print(f"\n[{key.upper()}]:")
+                print(f"{value}")
+            elif key in ["researcher_memory", "redactor_memory", "human_route"]:
+                pass 
+            else:
+                print(f"[{key.upper()}]: {str(value)[:150]}...") 
+        
         final_state = step
 
     if final_state and "intelligence_report" in final_state:

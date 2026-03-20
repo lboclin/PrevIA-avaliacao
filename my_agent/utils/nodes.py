@@ -230,7 +230,8 @@ def human_intervention(state: dict):
 
         action = input("\nEscolha uma ação (1-3): ")
         if action == "1":
-            return {"analyst_approval": "YES", "cycle_1_counter": 0, "human_route": "redactor"}
+            fallback_analysis = state.get("critical_analysis") or f"Human override. Base your report on these raw facts: {state.get('raw_data')}"
+            return {"analyst_approval": "YES", "critical_analysis": fallback_analysis, "cycle_1_counter": 0, "human_route": "redactor"}
         elif action == "2":
             new_instruction = input("Digite a instrução direta para o Pesquisador: ")
             return {"analyst_review": new_instruction, "cycle_1_counter": 0, "human_route": "researcher"}

@@ -1,14 +1,26 @@
-## Commit 8: implementação dos contadores de ciclos e do HITL
+## Commit 9: correção nos system prompts, na seleção dos modelos das LLMs e ajuste na lógica HITL
 
-As alterações feitas nessa etapa foram:
-1. Adicionei os contadores de ciclos dentro dos próprios nós `analyst` e `reviewer`.
-2. Criação de um novo nó `human_intervention`. Decidi mapear nesse nó qual o ciclo que chegou no limite de execuções, dessa forma, o usuário tem um contexto melhor do problema para tomar uma decisão. Esse mapeamento também altera o espaço de ações do usuário. Essa função foi implementada 100% pelo Gemini e conferida por mim posteriormente, já que tinham muitos prints, e eu não queria perder tempo escrever muito print e pouca lógica.
-3. Adicionei a aresta condicional e coloquei as funções condicionais do analista e do revisor para apontarem para o nó `human_intervention` quando o limite de ciclos fosse antigido.
-4. Adicionei uma função no prórpio arquivo `agent.py` para salvar o relatório como um arquivo md na pasta `intelligence_reports`. Sei que não é uma boa prática colocar funções auxiliares no código principal mas fiz isso para não ter que criar um novo código e adicionar apenas uma função nele, atrapalhando a minha arquitetura de pastas.
-5. Alterei o código da função `main` para que o usuário possa injetar o tópico como input.
+Após achar que estava tudo funcionando, acabei caindo em um erro um pouco misterioso. Basicamente, o analista até aprovava o pesquisador no primeiro ciclo, mas depois que o relatório chegava no revisor, o revisor sempre reprovava por falta de dados, fazia um long-cycle e depois entrava em um loop infinito do pesquisador e do analista até chegar a intervenção humana. Após analisar o que o analista estava reprovando do pesquisador, percebi que o analista estava apontando e reprovando qualquer lacuna de informação, coisas que as vezes não encontramos nas fontes mesmo e isso é normal. Percebi então que tanto o system prompt do analista quanto do revisor estavam muito rígidos, impossibilitando o pesquisador e o revisor de serem aprovados.
 
+Não só isso, como também pensei que poderia haver uma limitação nos agentes devido ao modelo que escolhi inicialmente `gpt-4o-mini`. Como o trabalho do redator e do revisor exigem menos abstração e possuem tarefas mais simples, optei por manter o `gpt-4o-mini` para eles e colocar o `gpt-4o` para o pesquisador e o analista.
+
+A solução que pensei para os system prompts foi:
+1. Pedir para que o analista sempre gerasse uma análise crítica. Dessa forma, mesmo que o primeiro ciclo chegue no limite de execuções, o humano pode intervir e verificar se é um erro de dados leve ou ruim, permitindo o redator escrever com aquela análise crítica. Decidi não abaixar a régua para forçar o pesquisador a manter o padrão de qualidade no maior nível possível, deixando essa decisão na mão do usuário. O custo dessa decisão é que acabamos forçando o modelo a "sempre" repetir o primeiro ciclo, o que gasta mais chamadas de API.
+2. Mas para o revisor final, eu realmente tive que abaixar a régua em relação aos dados. Alterei o critério da categoria `DATA_ERROR` de forma que ele só possa classificar o texto com isso quando o texto tiver uma falha muito grande de dados ou alucinação. Dessa forma, o revisor fica mais focado em avaliar a escrita do redator do que o trabalho do pesquisador e do analista.
+
+Rodei de novo e tive mais um problema: dessa vez de TPM (Tokens Per Minute). Minha conta da OpenAI tem um limite de 30k tokens para o modelo `gpt-4o` e 200k para o `gpt-4o-mini`, por isso não tinha tido esse problema até agora.
+Dei uma olhada no preço do `gpt-4o` e vi que eu não conseguiria arcar com os custos também, então optei por voltar para o `gpt-4o-mini`.
+
+Rodei novamente e percebi que o problema aqui pode estar realmente no pesquisador depois do primeiro ciclo. Isso porque ele sempre passa de primeira no analista, e depois do long-cycle ele começa a ter problemas até dar o limite de 3 ciclos. Pesquisei sobre isso e parece que o erro pode estar relacionado ao fato de que o ciclo ReAct pode forçar o modelo a encontrar uma informação muito difícil, e depois de muitas tentativas ele pode acabar alucinando, como se fosse uma desistência de encontrar tal estatística.
+
+Para solucionar isso, decidi por fim, abaixar a régua do analista e aceitar os dados casos eles estejam majoritariamente sólidos. Não só isso como eu também adicionei uma regra para o agente pesquisador na qual ele pode chamar no máximo 3 vezes uma ferramenta para encontrar um informação, depois disso ele deve colocar o dado como dado indisponível. Agora o analista e o revisor saberão que um dado está indisponível e não pedirão mais ele.
+
+### Resultado final:
+Para o meu tópico de teste principal, que foi "A bolha da IA", até mesmo abaixando a régua dos modelos, eu tive que aprovar o relatório manualmente pelo HITL. Isso porque o modelo não estava conseguindo alguns dados e o Revisor não estava aprovando em hipótese alguma. Mesmo assim, ao comparar o relatório final gerado após abaixar a régua com o relatório que os agentes super exigentes produziram, ele ainda produziu um bom relatório. O processo repetitivo de julgamento do relatório acabou deixando o texto com um tom defensivo e pouco executivo, como se o modelo estivesse afirmando mas sem depositar suas fichas no que está falando.
+Testei para outros tópicos também e vi que o resultado realmente foi melhor depois de abaixar a régua pois o sistema agora é mais generalista. Um mesmo tópico que tinha falhado infinitamente antes, agora passou de primeira, enquanto alguns tópicos estão sofrendo um pouco pra passar pelas revisões. Isso não é ruim, na verdade é o certo, pois se estivesse tudo passando 100% das vezes, os validadores não estariam sendo úteis.
+Minha conclusão final é de que essa solução foi um sucesso, mesmo que não tenha tornado o sistema em algo 100% acertivo.
 
 ## Next Steps:
-Rodar alguns tópicos para validar o sistema
-Analisar a possibilidade de colocar um calculador de custo no sistema
-Corrigir bugs e fazer as últimas alterações para entregar o sistema
+Formatar o código
+Criar o README.md
+Gravar o vídeo utilizando o sistema
