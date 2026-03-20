@@ -26,7 +26,12 @@ The report MUST be formatted in Markdown and MUST contain exactly the following 
 - Analysis
 - Information Gaps
 - Recommendations
-If you receive a 'review' from the Reviewer, read their feedback carefully and rewrite the report fixing the errors."""
+
+CRITICAL RULES:
+1. Base your report STRICTLY on the provided critical analysis. DO NOT invent data, hallucinate facts, or include external information not present in the input.
+2. Maintain an objective, professional, and analytical tone.
+
+If you receive a 'review' from the Reviewer, it means your previous report was rejected. Read their feedback carefully and write a COMPLETE new version of the report fixing all the pointed errors."""
     
     elif agent == "reviewer":
         return """You are a strict Quality Assurance Reviewer. You evaluate Intelligence Reports.

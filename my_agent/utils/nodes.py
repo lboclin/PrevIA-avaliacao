@@ -32,17 +32,17 @@ def researcher(state: dict):
         prompt=system_prompt(agent="researcher")
     )
 
-    messages_to_pass = state.get("researcher_memory", [])
+    messages_to_pass = list(state.get("researcher_memory", []))
     new_messages_to_memory = []
 
     if not messages_to_pass:
-        # Se a memória está vazia, é o primeiro ciclo, então passamos apenas o tópico
+        # Primeiro ciclo: passamos apenas o tópico
         instruction = f"Topic: {state.get('topic', '')}"
         new_message = HumanMessage(content=instruction)
         messages_to_pass.append(new_message)
         new_messages_to_memory.append(new_message)
     else:
-        # Se já tem memória, ele já sabe o tópico e lembra do seu último rascunho, só precisa das revisões
+        # Ciclos seguintes: Já possui o tópico e o último rascunho, então precisa apenas das revisões
         instruction = ""
         if state.get("analyst_review"):
             instruction += f"Your last research was rejected by the Analyst. Fix these issues:\n{state.get('analyst_review')}\n"
@@ -58,7 +58,6 @@ def researcher(state: dict):
     react_agent_answer = react_agent.invoke({"messages": messages_to_pass})
     final_result = react_agent_answer["messages"][-1].content
 
-    # Atualizamos a memória privada apenas com o resultado final, sem armazenar o "lixo" gerado pelo loop ReAct
     new_messages_to_memory.append(AIMessage(content=final_result))
 
     return {
@@ -118,15 +117,36 @@ def redactor(state: dict):
         api_key=openai_key
     )
 
-    messages = [
-        SystemMessage(content=system_prompt(agent="redactor")),
-        HumanMessage(content=f"Topic: {state.get('topic', '')}\nCritical analysis: {state.get('critical_analysis', '')}\nReviewer review (if exists): {state.get('reviewer_review', '')}\nLast intelligence report: {state.get('intelligence_report', '')}")
-    ]
+    messages_to_pass = list(state.get("redactor_memory", []))
+    new_messages_to_memory = []
 
-    llm_answer = llm.invoke(messages)
+    if not messages_to_pass:
+        # Primeiro ciclo: Passamos o tópico e a análise crítica
+        instruction = f"Topic: {state.get('topic', '')}\nCritical analysis: {state.get('critical_analysis', '')}"
+        new_message = HumanMessage(content=instruction)
+        messages_to_pass.append(new_message)
+        new_messages_to_memory.append(new_message)
+    else:
+        # Ciclos seguintes: Passamos a nova análise (se houver) e o feedback do revisor
+        instruction = f"Critical analysis: {state.get('critical_analysis', '')}\n"
+
+        if state.get("reviewer_review"):
+            instruction += f"The final report was rejected. Reviewer context:\n{state.get('reviewer_review')}\n"
+        
+        if instruction:
+            new_message = HumanMessage(content=instruction)
+            messages_to_pass.append(new_message)
+            new_messages_to_memory.append(new_message)
+        
+    full_messages = [SystemMessage(content=system_prompt(agent="redactor"))] + messages_to_pass
+    
+    llm_answer = llm.invoke(full_messages)
+
+    new_messages_to_memory.append(AIMessage(content=llm_answer.content))
 
     return {
-        "intelligence_report": llm_answer.content
+        "intelligence_report": llm_answer.content,
+        "redactor_memory": new_messages_to_memory
     }
 
 class ReviewerOutput(BaseModel):

@@ -19,4 +19,5 @@ class GlobalState(TypedDict):
     cycle_3_counter: int # Long-cycle: Reviewer -> Researcher 
 
     researcher_memory: Annotated[list[AnyMessage], operator.add]
+    redactor_memory: Annotated[list[AnyMessage], operator.add]
 
