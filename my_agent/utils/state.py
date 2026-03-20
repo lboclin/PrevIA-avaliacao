@@ -20,4 +20,4 @@ class GlobalState(TypedDict):
 
     researcher_memory: Annotated[list[AnyMessage], operator.add]
     redactor_memory: Annotated[list[AnyMessage], operator.add]
-
+    human_route: str

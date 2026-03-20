@@ -100,11 +100,18 @@ def analyst(state: dict):
     ]
 
     llm_answer = structured_llm.invoke(messages)
+
+    cycle_1_counter = state.get("cycle_1_counter", 0)
+    if llm_answer.analyst_approval == "NO":
+        cycle_1_counter += 1
+    else:
+        cycle_1_counter = 0
     
     return {
         "critical_analysis": llm_answer.critical_analysis,
         "analyst_review": llm_answer.analyst_review,
-        "analyst_approval": llm_answer.analyst_approval
+        "analyst_approval": llm_answer.analyst_approval,
+        "cycle_1_counter": cycle_1_counter
     }
 
 
@@ -178,8 +185,95 @@ def reviewer(state: dict):
     ]
 
     llm_answer = structured_llm.invoke(messages)
+
+    cycle_2_counter = state.get("cycle_2_counter", 0)
+    cycle_3_counter = state.get("cycle_3_counter", 0)
+
+    if llm_answer.reviewer_approval == "WRITING_ERROR":
+        cycle_2_counter += 1
+    elif llm_answer.reviewer_approval == "DATA_ERROR":
+        cycle_3_counter += 1
+    elif llm_answer.reviewer_approval == "APPROVED":
+        cycle_2_counter = 0
+        cycle_3_counter = 0
     
     return {
         "reviewer_review": llm_answer.reviewer_review,
-        "reviewer_approval": llm_answer.reviewer_approval
+        "reviewer_approval": llm_answer.reviewer_approval,
+        "cycle_2_counter": cycle_2_counter,
+        "cycle_3_counter": cycle_3_counter
     }
+
+CYCLE_LIMIT = 3
+
+def human_intervention(state: dict):
+    """
+    Nó de Human-in-the-Loop acionado quando o limite de ciclos é atingido.
+    Contextualiza o humano sobre qual ciclo falhou e oferece opções específicas.
+    """
+    print("\n" + "="*70)
+    print("⚠️  ALERTA DE LOOP: INTERVENÇÃO HUMANA NECESSÁRIA  ⚠️")
+    print("="*70)
+
+    cycle_1 = state.get("cycle_1_counter", 0)
+    cycle_2 = state.get("cycle_2_counter", 0)
+    cycle_3 = state.get("cycle_3_counter", 0)
+
+    if cycle_1 >= CYCLE_LIMIT:
+        print("🛑 PROBLEMA: O Analista está rejeitando repetidamente os dados do Pesquisador (Ciclo Curto 1).")
+        print(f"Tópico: {state.get('topic')}")
+        print(f"Última crítica do Analista:\n{state.get('analyst_review', 'Nenhuma')}")
+        print("\nOpções de Intervenção:")
+        print("1 - Aprovar os dados à força e forçar o avanço para o Redator.")
+        print("2 - Fornecer uma instrução manual ao Pesquisador para uma nova busca.")
+        print("3 - Abortar a execução.")
+
+        action = input("\nEscolha uma ação (1-3): ")
+        if action == "1":
+            return {"analyst_approval": "YES", "cycle_1_counter": 0, "human_route": "redactor"}
+        elif action == "2":
+            new_instruction = input("Digite a instrução direta para o Pesquisador: ")
+            return {"analyst_review": new_instruction, "cycle_1_counter": 0, "human_route": "researcher"}
+        else:
+            raise Exception("Execução abortada pelo usuário.")
+
+    elif cycle_2 >= CYCLE_LIMIT:
+        print("🛑 PROBLEMA: O Revisor está rejeitando repetidamente a escrita do Redator (Ciclo Curto 2).")
+        print(f"Última crítica do Revisor:\n{state.get('reviewer_review', 'Nenhuma')}")
+        print("\nOpções de Intervenção:")
+        print("1 - Aprovar o relatório à força e finalizar o processo.")
+        print("2 - Fornecer uma instrução manual para o Redator reescrever.")
+        print("3 - Abortar a execução.")
+
+        action = input("\nEscolha uma ação (1-3): ")
+        if action == "1":
+            return {"reviewer_approval": "APPROVED", "cycle_2_counter": 0, "human_route": "end"}
+        elif action == "2":
+            new_instruction = input("Digite a instrução direta para o Redator: ")
+            return {"reviewer_review": new_instruction, "cycle_2_counter": 0, "human_route": "redactor"}
+        else:
+            raise Exception("Execução abortada pelo usuário.")
+
+    elif cycle_3 >= CYCLE_LIMIT:
+        print("🛑 PROBLEMA: O Revisor está pedindo repetidamente mais dados ao Pesquisador (Ciclo Longo 3).")
+        print(f"Última crítica do Revisor:\n{state.get('reviewer_review', 'Nenhuma')}")
+        print("\nOpções de Intervenção:")
+        print("1 - Aprovar o relatório ignorando a falta de dados e finalizar.")
+        print("2 - Fornecer uma instrução manual ao Pesquisador para encontrar esses dados específicos.")
+        print("3 - Redirecionar o erro para o Redator (mudar para WRITING_ERROR).")
+        print("4 - Abortar a execução.")
+
+        action = input("\nEscolha uma ação (1-4): ")
+        if action == "1":
+            return {"reviewer_approval": "APPROVED", "cycle_3_counter": 0, "human_route": "end"}
+        elif action == "2":
+            new_instruction = input("Digite a instrução para o Pesquisador: ")
+            return {"reviewer_review": new_instruction, "cycle_3_counter": 0, "human_route": "researcher"}
+        elif action == "3":
+            new_instruction = input("Digite a instrução de formatação para o Redator: ")
+            return {"reviewer_approval": "WRITING_ERROR", "reviewer_review": new_instruction, "cycle_3_counter": 0, "human_route": "redactor"}
+        else:
+            raise Exception("Execução abortada pelo usuário.")
+
+    else:
+        return {"human_route": "end"}
