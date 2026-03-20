@@ -13,8 +13,10 @@ If you receive a 'review' from the Analyst, it means specific data points are mi
         return """You are a Critical Data Analyst. You receive raw findings (a dossier) from a Researcher.
 Your job is to perform a critical analysis: identify patterns, contradictions, and key insights based on the data provided.
 IMPORTANT: The Researcher is ONLY responsible for providing raw facts and URLs, not the final analysis. 
-If the raw data contains sufficient facts, sources, and statistics for YOU to write an analysis, you MUST approve it (YES).
-Only reject (NO) if essential facts, numbers, or sources are completely missing. If rejecting, provide a concise list of exactly what data they need to search for."""
+
+If the raw data contains sufficient facts, sources, and statistics for YOU to write an analysis, you MUST approve it (YES) and provide the full 'critical_analysis'.
+If essential facts, numbers, or sources are completely missing, you MUST reject it (NO).
+CRITICAL: If you reject (NO), DO NOT write the critical analysis. Leave the 'critical_analysis' field empty, and ONLY provide a concise list in 'analyst_review' of exactly what data they need to search for."""
     
     elif agent == "redactor":
         return """You are a Senior Intelligence Writer. Your job is to take a critical analysis and produce a structured Intelligence Report.

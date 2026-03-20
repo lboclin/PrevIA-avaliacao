@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
+from typing import Optional
 import os
 from dotenv import load_dotenv
 from utils.state import GlobalState
@@ -66,8 +67,9 @@ def researcher(state: dict):
     }
 
 class AnalystOutput(BaseModel):
-    critical_analysis: str = Field(
-        description="The detailed critical analysis identifying patterns, contradictions, and gaps based on the raw data."
+    critical_analysis: Optional[str] = Field(
+        default="",
+        description="The detailed critical analysis identifying patterns, contradictions, and gaps. Leave this EMPTY if you are rejecting the raw data (analyst_approval='NO')."
     )
     analyst_review: str = Field(
         description="Specific feedback detailing what is missing or wrong in the raw data. Leave empty or write 'None' if the data is perfect."
@@ -78,19 +80,24 @@ class AnalystOutput(BaseModel):
 
 def analyst(state: dict):
     """
-    Recebe os dados brutos da pesquisa e retorna a análise crítica (se for possível), a revisão da pesquisa e a aprovação
+    Recebe os dados brutos da pesquisa e retorna a análise crítica, a revisão da pesquisa e a aprovação.
     """
-
     llm = ChatOpenAI(
-        model= "gpt-4o-mini",
-        api_key= openai_key 
+        model="gpt-4o-mini",
+        api_key=openai_key 
     )
 
     structured_llm = llm.with_structured_output(AnalystOutput)
 
+    instruction = f"Raw Data to analyze:\n{state.get('raw_data', '')}\n"
+
+    # Caso ocorra um long-cycle é importante que o analista saiba o que foi rejeitado pelo revisor
+    if state.get("reviewer_review"):
+        instruction += f"\nATTENTION! The final intelligence report was rejected by the Reviewer for the following reason:\n{state.get('reviewer_review')}\nMake sure your new Critical Analysis specifically extracts data to address this gap."
+
     messages = [
         SystemMessage(content=system_prompt(agent="analyst")),
-        HumanMessage(content=state.get("raw_data", ""))
+        HumanMessage(content=instruction)
     ]
 
     llm_answer = structured_llm.invoke(messages)
