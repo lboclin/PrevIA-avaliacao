@@ -4,6 +4,7 @@ from utils.nodes import researcher, analyst, redactor, reviewer, human_intervent
 import re
 import os
 
+# Define o limite de ciclos para a ativação da intervenção humana
 CYCLE_LIMIT = 3
 
 workflow = StateGraph(GlobalState)

@@ -15,6 +15,7 @@ openai_key = os.getenv('OPENAI_API_KEY')
 if not openai_key:
     raise ValueError("A OPENAI_API_KEY não foi encontrada. Verifique seu arquivo .env")
 
+# Envelopando as ferramentas de busca do researcher
 research_tools = [search_api, extract_api]
 
 def researcher(state: dict):
@@ -204,6 +205,7 @@ def reviewer(state: dict):
         "cycle_3_counter": cycle_3_counter
     }
 
+# Define o limite de ciclos para a ativação da intervenção humana
 CYCLE_LIMIT = 3
 
 def human_intervention(state: dict):
