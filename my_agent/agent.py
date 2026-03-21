@@ -126,7 +126,7 @@ if __name__ == "__main__":
             elif key in ["researcher_memory", "redactor_memory", "human_route"]:
                 pass 
             else:
-                print(f"[{key.upper()}]: {str(value)[:150]}...") 
+                print(f"[{key.upper()}]: {str(value)[:10]}...\n") 
         
         final_state = step
 
